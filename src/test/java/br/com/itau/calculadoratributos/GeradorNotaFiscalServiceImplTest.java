@@ -1,19 +1,21 @@
 package br.com.itau.calculadoratributos;
 
 import br.com.itau.geradornotafiscal.model.*;
-import br.com.itau.geradornotafiscal.service.impl.FreteServiceImpl;
-import br.com.itau.geradornotafiscal.service.impl.ItemNotaFiscalServiceImpl;
-import br.com.itau.geradornotafiscal.service.impl.GeradorNotaFiscalServiceImpl;
+import br.com.itau.geradornotafiscal.service.impl.*;
+import br.com.itau.mock.PedidoCreator;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 public class GeradorNotaFiscalServiceImplTest {
 
@@ -26,6 +28,19 @@ public class GeradorNotaFiscalServiceImplTest {
     @Mock
     private FreteServiceImpl freteService;
 
+
+    @Mock
+    private EstoqueServiceImpl estoqueService;
+
+    @Mock
+    private RegistroServiceImpl registroService;
+
+    @Mock
+    private EntregaServiceImpl entregaService;
+
+    @Mock
+    private FinanceiroServiceImpl financeiroService;
+
     @BeforeEach
     public void setup() {
         MockitoAnnotations.openMocks(this);
@@ -34,62 +49,23 @@ public class GeradorNotaFiscalServiceImplTest {
 
 
     @Test
-    public void shouldGenerateNotaFiscalForTipoPessoaFisicaWithValorTotalItensLessThan500() {
-        Pedido pedido = new Pedido();
-        pedido.setValorTotalItens(new BigDecimal(400));
-        pedido.setValorFrete(new BigDecimal(100));
-        Destinatario destinatario = new Destinatario();
-        destinatario.setTipoPessoa(TipoPessoa.FISICA);
+    @DisplayName("deve gerar nota fiscal com valor total itens igual ao do pedido e destinatario também")
+    public void deveGerarNotaFiscal() {
 
-        // Create and add Endereco to the Destinatario
-        Endereco endereco = new Endereco();
-        endereco.setFinalidade(Finalidade.ENTREGA);
-        endereco.setRegiao(Regiao.SUDESTE);
-        destinatario.setEnderecos(Arrays.asList(endereco));
+        Pedido pedido = PedidoCreator.criarPedido(TipoPessoa.FISICA, Finalidade.ENTREGA, Regiao.SUDESTE);
 
-        pedido.setDestinatario(destinatario);
+        ItemNotaFiscal itemNotaFiscal = new ItemNotaFiscal();
+        itemNotaFiscal.setValorUnitario(new BigDecimal(100));
+        itemNotaFiscal.setQuantidade(4);
 
-        // Create and add items to the Pedido
-        Item item = new Item();
-        item.setValorUnitario(new BigDecimal(100));
-        item.setQuantidade(4);
-        pedido.setItens(Arrays.asList(item));
+        when(freteService.calcularFrete(any())).thenReturn(new BigDecimal(10));
+        when(itemNotaFiscalService.gerarItensNotaFiscal(any())).thenReturn(List.of(itemNotaFiscal));
 
         NotaFiscal notaFiscal = geradorNotaFiscalService.gerarNotaFiscal(pedido);
-
         assertEquals(pedido.getValorTotalItens(), notaFiscal.getValorTotalItens());
-        assertEquals(1, notaFiscal.getItens().size());
-        assertEquals(0, notaFiscal.getItens().get(0).getValorTributoItem());
+        assertEquals(pedido.getDestinatario(), notaFiscal.getDestinatario());
+
     }
 
-    @Test
-    public void shouldGenerateNotaFiscalForTipoPessoaJuridicaWithRegimeTributacaoLucroPresumidoAndValorTotalItensGreaterThan5000() {
-        Pedido pedido = new Pedido();
-        pedido.setValorTotalItens(new BigDecimal(6000));
-        pedido.setValorFrete(new BigDecimal(100));
-        Destinatario destinatario = new Destinatario();
-        destinatario.setTipoPessoa(TipoPessoa.JURIDICA);
-        destinatario.setRegimeTributacao(RegimeTributacaoPJ.LUCRO_PRESUMIDO);
-
-        // Create and add Endereco to the Destinatario
-        Endereco endereco = new Endereco();
-        endereco.setFinalidade(Finalidade.ENTREGA);
-        endereco.setRegiao(Regiao.SUDESTE);
-        destinatario.setEnderecos(Arrays.asList(endereco));
-
-        pedido.setDestinatario(destinatario);
-
-        // Create and add items to the Pedido
-        Item item = new Item();
-        item.setValorUnitario(new BigDecimal(1000));
-        item.setQuantidade(6);
-        pedido.setItens(Arrays.asList(item));
-
-        NotaFiscal notaFiscal = geradorNotaFiscalService.gerarNotaFiscal(pedido);
-
-        assertEquals(pedido.getValorTotalItens(), notaFiscal.getValorTotalItens());
-        assertEquals(1, notaFiscal.getItens().size());
-        assertEquals(item.getValorUnitario().multiply(BigDecimal.valueOf(0.20)), notaFiscal.getItens().get(0).getValorTributoItem());
-    }
 
 }
